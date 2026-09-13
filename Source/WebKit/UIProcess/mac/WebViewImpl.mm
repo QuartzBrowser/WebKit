@@ -3252,7 +3252,8 @@ void WebViewImpl::selectionDidChange()
 #endif
 
 #if ENABLE(WRITING_TOOLS)
-    bool wantsCompleteWritingTools = isEditable() || page->configuration().writingToolsBehavior() == WebCore::WritingTools::Behavior::Complete;
+    auto writingToolsBehavior = page->configuration().writingToolsBehavior();
+    bool wantsCompleteWritingTools = writingToolsBehavior != WebCore::WritingTools::Behavior::None && (isEditable() || writingToolsBehavior == WebCore::WritingTools::Behavior::Complete);
     if (wantsCompleteWritingTools && !alreadyNotifiedClient) {
         auto isRange = page->editorState().hasPostLayoutData() && page->editorState().selectionType == WebCore::SelectionType::Range;
         auto selectionRect = isRange ? page->editorState().postLayoutData->selectionBoundingRect : IntRect { };
@@ -3514,7 +3515,7 @@ bool WebViewImpl::validateUserInterfaceItem(id<NSValidatedUserInterfaceItem> ite
 
 #if ENABLE(WRITING_TOOLS) && HAVE(NSRESPONDER_WRITING_TOOLS_SUPPORT)
     if (action == @selector(showWritingTools:))
-        return m_page->shouldEnableWritingToolsRequestedTool(convertToWebRequestedTool((WTRequestedTool)[item tag]));
+        return m_page->configuration().writingToolsBehavior() != WebCore::WritingTools::Behavior::None && m_page->shouldEnableWritingToolsRequestedTool(convertToWebRequestedTool((WTRequestedTool)[item tag]));
 #endif
 
     // Next, handle editor commands. Start by returning true for anything that is not an editor command.
@@ -5556,6 +5557,9 @@ void WebViewImpl::removeTextPlaceholder(NSTextPlaceholder *placeholder, bool wil
 
 void WebViewImpl::showWritingTools(WTRequestedTool tool)
 {
+    if (m_page->configuration().writingToolsBehavior() == WebCore::WritingTools::Behavior::None)
+        return;
+
     FloatRect selectionRect;
 
     auto& editorState = m_page->editorState();
@@ -5569,7 +5573,7 @@ ALLOW_DEPRECATED_DECLARATIONS_END
 
 bool WebViewImpl::shouldAllowWritingToolsAffordance() const
 {
-    return m_page->editorState().isEditableOrRanged() && !isSingleLineInputType(m_focusedElementInputType);
+    return m_page->configuration().writingToolsBehavior() != WebCore::WritingTools::Behavior::None && m_page->editorState().isEditableOrRanged() && !isSingleLineInputType(m_focusedElementInputType);
 }
 
 void WebViewImpl::addTextAnimationForAnimationID(WTF::UUID uuid, const WebCore::TextAnimationData& data)
@@ -7809,7 +7813,7 @@ void WebViewImpl::handleContextMenuTranslation(const WebCore::TranslationContext
 
 bool WebViewImpl::canHandleContextMenuWritingTools() const
 {
-    if (!PAL::isWritingToolsUIFrameworkAvailable() || ![PAL::getWTWritingToolsViewControllerClassSingleton() isAvailable] || m_page->writingToolsBehavior() == WebCore::WritingTools::Behavior::None)
+    if (m_page->writingToolsBehavior() == WebCore::WritingTools::Behavior::None || !PAL::isWritingToolsUIFrameworkAvailable() || ![PAL::getWTWritingToolsViewControllerClassSingleton() isAvailable])
         return false;
 
 #if USE(APPLE_INTERNAL_SDK) && __has_include(<WebKitAdditions/WebViewImplWritingToolsAdditions.mm>)

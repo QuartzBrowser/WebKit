@@ -2802,13 +2802,18 @@ static void expectScheduleShowAffordanceForSelectionRectCalled(bool expectation)
 #endif
 }
 
-TEST(WritingTools, APIWithBehaviorNone)
+static void testAPIWithBehaviorNone(bool editable)
 {
     // If `CocoaWritingToolsBehaviorNone`, there should be no affordance, no context menu item, and no inline editing support.
 
 #if PLATFORM(MAC)
     InstanceMethodSwizzler swizzler(PAL::getWTWritingToolsClassSingleton(), @selector(scheduleShowAffordanceForSelectionRect:ofView:forDelegate:), imp_implementationWithBlock(^(id object, NSRect rect, NSView *view, id delegate) {
         didCallScheduleShowAffordanceForSelectionRect = true;
+    }));
+
+    __block bool didShowWritingTools = false;
+    InstanceMethodSwizzler showToolSwizzler(PAL::getWTWritingToolsClassSingleton(), @selector(showTool:forSelectionRect:ofView:forDelegate:), imp_implementationWithBlock(^(id object, WTRequestedTool tool, NSRect rect, NSView *view, id delegate) {
+        didShowWritingTools = true;
     }));
 #endif
 
@@ -2826,6 +2831,7 @@ TEST(WritingTools, APIWithBehaviorNone)
 
     RetainPtr webView = adoptNS([[WritingToolsWKWebView alloc] initWithHTMLString:@"<body id='p' contenteditable><p id='first'>AAAA BBBB CCCC</p></body>" writingToolsBehavior:CocoaWritingToolsBehaviorNone]);
     [webView setUIDelegate:delegate.get()];
+    [webView _setEditable:editable];
 
     [webView focusDocumentBodyAndSelectAll];
 
@@ -2836,6 +2842,15 @@ TEST(WritingTools, APIWithBehaviorNone)
     EXPECT_EQ([webView writingToolsBehaviorForTesting], CocoaWritingToolsBehaviorNone);
 
 #if PLATFORM(MAC)
+    EXPECT_FALSE([webView allowsWritingToolsAffordance]);
+
+    RetainPtr menuItem = adoptNS([[NSMenuItem alloc] initWithTitle:@"Writing Tools" action:@selector(showWritingTools:) keyEquivalent:@""]);
+    [menuItem setTag:WTRequestedToolIndex];
+    EXPECT_FALSE([webView validateUserInterfaceItem:menuItem.get()]);
+    [webView showWritingTools:menuItem.get()];
+    [webView _showWritingTools];
+    EXPECT_FALSE(didShowWritingTools);
+
     [webView rightClickAtPoint:NSMakePoint(10, [webView frame].size.height - 10)];
     TestWebKitAPI::Util::run(&gotProposedMenu);
 
@@ -2848,6 +2863,16 @@ TEST(WritingTools, APIWithBehaviorNone)
     EXPECT_NULL([proposedMenu itemWithIdentifier:_WKMenuItemIdentifierRewrite]);
 #endif
 #endif
+}
+
+TEST(WritingTools, APIWithBehaviorNone)
+{
+    testAPIWithBehaviorNone(false);
+}
+
+TEST(WritingTools, APIWithBehaviorNoneAndEditableWebView)
+{
+    testAPIWithBehaviorNone(true);
 }
 
 TEST(WritingTools, APIWithBehaviorDefault)

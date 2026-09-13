@@ -85,7 +85,7 @@
     _contentPreventsDefault = NO;
     
     RetainPtr<id> animationController = [_immediateActionRecognizer animationController];
-    if (PAL::isQuickLookUIFrameworkAvailable() && [animationController isKindOfClass:PAL::getQLPreviewMenuItemClassSingleton()]) {
+    if (animationController && PAL::isQuickLookUIFrameworkAvailable() && [animationController isKindOfClass:PAL::getQLPreviewMenuItemClassSingleton()]) {
         RetainPtr menuItem = (QLPreviewMenuItem *)animationController.get();
         menuItem.get().delegate = nil;
     }

@@ -1483,13 +1483,16 @@ void WebPageProxy::setWritingToolsActive(bool active)
 
 WebCore::WritingTools::Behavior WebPageProxy::writingToolsBehavior() const
 {
+    auto& configuration = this->configuration();
+    if (configuration.writingToolsBehavior() == WebCore::WritingTools::Behavior::None)
+        return WebCore::WritingTools::Behavior::None;
+
     if (isEditable())
         return WebCore::WritingTools::Behavior::Complete;
 
     auto& editorState = this->editorState();
-    auto& configuration = this->configuration();
 
-    if (configuration.writingToolsBehavior() == WebCore::WritingTools::Behavior::None || editorState.selectionType == WebCore::SelectionType::None || editorState.isInPasswordField || editorState.isInPlugin)
+    if (editorState.selectionType == WebCore::SelectionType::None || editorState.isInPasswordField || editorState.isInPlugin)
         return WebCore::WritingTools::Behavior::None;
 
     if (configuration.writingToolsBehavior() == WebCore::WritingTools::Behavior::Complete && editorState.isContentEditable)
